@@ -64,9 +64,21 @@ defmodule Pepe.DB.Query do
   def run(conn_name, sql, ctx) do
     with :ok <- reject_write(sql),
          {:ok, cfg} <- fetch_connection(conn_name),
-         {:ok, tenant} <- resolve_tenant(cfg, ctx),
+         {:ok, tenant} <- query_tenant(cfg, ctx),
          {:ok, pid} <- DB.ensure(conn_name) do
       Postgrex.transaction(pid, &run_in_transaction(&1, sql, tenant))
+    end
+  end
+
+  @doc false
+  # `resolve_tenant/2`'s `:none` (an unscoped connection) is a valid answer, not a failure, so it
+  # is wrapped here for `run/3`'s `with`; matched bare, it fell out of the `with` and came back as
+  # the result, which made every unscoped connection fail. Public for tests.
+  @spec query_tenant(map(), map()) :: {:ok, term()} | {:error, :bad_tenant_binding}
+  def query_tenant(cfg, ctx) do
+    case resolve_tenant(cfg, ctx) do
+      :none -> {:ok, :none}
+      other -> other
     end
   end
 

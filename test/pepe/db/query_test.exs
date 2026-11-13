@@ -87,4 +87,20 @@ defmodule Pepe.DB.QueryTest do
       assert Query.resolve_tenant(cfg, poisoned_ctx) == {:ok, "real-tenant"}
     end
   end
+
+  describe "query_tenant/2 (what run/3 matches on)" do
+    @agent %Agent{name: "acme/support", project: "acme", bare: "support"}
+
+    test "an unscoped connection is {:ok, :none}, so run/3 goes on to query instead of returning :none" do
+      assert Query.query_tenant(%{tenant_column: nil, tenant_binding: nil}, %{}) == {:ok, :none}
+    end
+
+    test "scoped connections and fail-closed bindings pass through unchanged" do
+      fixed = %{tenant_column: "company_id", tenant_binding: %{"mode" => "fixed", "value" => "acme-inc"}}
+      assert Query.query_tenant(fixed, %{agent: @agent}) == {:ok, "acme-inc"}
+
+      unbound = %{tenant_column: "company_id", tenant_binding: nil}
+      assert Query.query_tenant(unbound, %{agent: @agent}) == {:error, :bad_tenant_binding}
+    end
+  end
 end
